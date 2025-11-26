@@ -1,1 +1,6 @@
-
+Sap_hec_dc_number: 8
+Customer_number: 45
+Customer_id: 115
+Sap_prod_network: 192.168.1.0/24
+Customer_peer_ip: 45.46.47.48
+psk: Cisco12345
