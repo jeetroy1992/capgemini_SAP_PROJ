@@ -323,11 +323,12 @@ flowchart TD
   style C fill:#4a2a1a,color:#fff
   style D fill:#2a1a4a,color:#fff
 ```
-#### Non-HTTP/HTTPS
+#### Non-HTTP/HTTPS (SMTP port 587, SSH port 22, any other port) 
 * Routed via Default Gateway: `x.x.x.1` (HA-Core)
 * HA-Core forwards to F5 (.249)
 * SNAT performed at F5
 * Forwarded to Internet Routers
+Note: Does NOT go through Squid proxy. Goes directly VM -> HA-Core -> F5 -> Internet. Squid only understands HTTP/HTTPS.
 
 Now let's see the flow:
 1. **VM 192.168.12.11** → wants to reach **Google 8.8.8.8**  
