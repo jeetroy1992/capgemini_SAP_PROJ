@@ -1,0 +1,86 @@
+```mermaid
+sequenceDiagram
+   autonumber
+   participant U as User1000 Corporate VPN
+   participant VPN as VPN Tunnel Cust Network
+   participant CORE as Core Network 10.10.10.100
+   participant VIP as F5 Internal VIP 192.168.1.100:443
+   participant CSSL as Client SSL Profile www.wd.abc.co.in Internal CA
+   participant SNAT as SNAT Pool .249 .250 .251
+   participant PERS as Persistence Cookie Based
+   participant SSSL as Server SSL Profile Internal CA
+   participant SAP1 as SAP Server 1 10.10.10.11:8000
+   participant SAP2 as SAP Server 2 10.10.10.12:8000
+   rect rgb(230, 240, 255)
+       Note over U,CORE: STEP 1 - VPN Connection
+       U->>VPN: Connect Corporate VPN - User1000 to Cust Network
+       VPN->>CORE: VPN Tunnel to SAP HEC Core 10.10.10.100
+       CORE-->>U: VPN Connected - Now inside HEC Network
+   end
+   rect rgb(255, 245, 220)
+       Note over U,VIP: STEP 2 - TCP 3-Way Handshake
+       U->>VIP: SYN to 192.168.1.100:443
+       VIP-->>U: SYN-ACK
+       U->>VIP: ACK - TCP Established
+   end
+   rect rgb(220, 255, 220)
+       Note over U,CSSL: STEP 3 - TLS Handshake LEG 1 - VPN User to F5
+       U->>CSSL: CLIENT HELLO - TLS 1.3 - Cipher List - Client Random - Session ID
+       CSSL-->>U: SERVER HELLO - TLS 1.3 Selected - AES-256-GCM-SHA384 - Server Random
+       CSSL-->>U: CERTIFICATE - www.wd.abc.co.in - Issued by SAP Internal CA
+       CSSL-->>U: CERTIFICATE CHAIN - SAP Internal Intermediate CA - SAP Internal Root CA
+       Note over U: VPN Client verifies - Internal Root trusted via Corporate cert store - Chain valid
+       U->>CSSL: KEY EXCHANGE - Pre-Master Secret encrypted with F5 Public Key
+       Note over U,CSSL: Both sides derive Session Keys using Client Random plus Server Random plus Pre-Master Secret
+       U->>CSSL: CHANGE CIPHER SPEC - Switching to encrypted
+       CSSL-->>U: CHANGE CIPHER SPEC - Switching to encrypted
+       U->>CSSL: FINISHED encrypted
+       CSSL-->>U: FINISHED encrypted
+       Note over U,CSSL: LEG 1 Tunnel Established - VPN User to F5
+   end
+   rect rgb(255, 230, 230)
+       Note over VIP,SNAT: STEP 4 - F5 Decrypts and Applies SNAT
+       U->>CSSL: HTTPS GET /sap/bc/gui/ Host www.wd.abc.co.in
+       CSSL->>CSSL: Decrypt using Session Key - Now readable plain HTTP
+       CSSL->>SNAT: Apply SNAT Pool - src becomes 10.10.10.249
+   end
+   rect rgb(255, 240, 200)
+       Note over PERS,SAP2: STEP 5 - Persistence Check
+       SNAT->>PERS: SNAT Applied - Check Persistence Cookie
+       alt First Visit - No Cookie
+           PERS->>SAP1: No cookie - Load Balance - Selected Server 1 - 10.10.10.11:8000
+       else Return Visit - Cookie Found
+           PERS->>SAP1: Cookie match - Always Server 1 - SAP Session intact
+       end
+   end
+   rect rgb(220, 240, 255)
+       Note over SSSL,SAP1: STEP 6 - TLS Handshake LEG 2 - F5 to SAP Server
+       PERS->>SSSL: Forward to SAP Server 1
+       SSSL->>SAP1: CLIENT HELLO - TLS 1.3 - Cipher List - Client Random
+       SAP1-->>SSSL: SERVER HELLO - TLS 1.3 Selected - Cipher Selected - Server Random
+       SAP1-->>SSSL: CERTIFICATE - hec-internal.local - Issued by SAP Internal CA
+       Note over SSSL: F5 verifies backend cert - SAP Internal CA trusted - Cert valid - Not expired
+       SSSL->>SAP1: KEY EXCHANGE - Pre-Master Secret encrypted with SAP Server Public Key
+       Note over SSSL,SAP1: Both sides derive Session Keys
+       SSSL->>SAP1: CHANGE CIPHER SPEC
+       SAP1-->>SSSL: CHANGE CIPHER SPEC
+       SSSL->>SAP1: FINISHED encrypted
+       SAP1-->>SSSL: FINISHED encrypted
+       Note over SSSL,SAP1: LEG 2 Tunnel Established - F5 to SAP Server 1
+   end
+   rect rgb(220, 255, 220)
+       Note over SAP1: STEP 7 - SAP Processes Request
+       SSSL->>SAP1: HTTP GET /sap/bc/gui/
+       SAP1-->>SSSL: HTTP 200 OK - SAP Fiori Content
+       SAP2-->>SAP2: Standby
+   end
+   rect rgb(255, 245, 220)
+       Note over U,PERS: STEP 8 - Response Back to VPN User
+       SSSL-->>PERS: Decrypt SAP Response
+       PERS-->>CSSL: Insert Cookie - BIGipServer Pool 10.10.10.11:8000 path slash HttpOnly
+       CSSL-->>U: Re-encrypt - HTTPS 200 OK - SAP Content - Persistence Cookie set
+   end
+   rect rgb(240, 240, 240)
+       Note over U,SAP1: STEP 9 - Complete - Internal Cert www.wd.abc.co.in SAP Internal CA - Cookie stored - Session intact
+   end
+```
