@@ -102,4 +102,33 @@ AZ_GW -.-> FW
 | Use Case | Quick hybrid setup | Enterprise production | Enterprise production |
 | Reliability | Depends on internet | SLA-backed | SLA-backed |
 
+## Packet Walk
+
+```mermaid
+flowchart TB
+%% ================= START =================
+S1["STEP 1️⃣\nUser generates packet\n\nInner Packet:\nSIP: 10.1.0.10\nDIP: 10.0.1.10 / 10.207.17.4\n\nApp Traffic (SAP/HTTP)"]
+S2["STEP 2️⃣\nL2 Switch forwards\n\n- MAC lookup\n- VLAN forwarding\n\n(No change in SIP/DIP)"]
+S3["STEP 3️⃣\nFirewall receives traffic\n\nChecks:\n- Interesting traffic?\n- Matches crypto ACL?\n\nYES → Send to IPSec"]
+S4["STEP 4️⃣\nIKEv2 Phase-1\n(ISAKMP SA Established)\n\n- Encryption (AES)\n- Hash (SHA)\n- DH Exchange\n- PSK Authentication"]
+S5["STEP 5️⃣\nIKEv2 Phase-2\n(IPSec SA Established)\n\n- SPI allocated\n- Traffic selectors defined\n(10.1.0.0/24 ↔ Remote Subnet)"]
+S6["STEP 6️⃣\nPacket Encapsulation\n\nInner Packet (unchanged):\nSIP: 10.1.0.10\nDIP: 10.x.x.x\n\nOuter Packet added:\nSIP: 185.10.10.1\nDIP: Cloud GW Public IP\n\nProtocol: ESP / UDP 4500"]
+S7["STEP 7️⃣\nInternet Transport\n\n- Encrypted ESP packet\n- Traverses ISP\n\nOuter Header only visible"]
+%% ================= CLOUD ENTRY =================
+S8["STEP 8️⃣\nCloud VPN Gateway receives packet\n\nAWS VGW / Azure VPN GW\n\nChecks:\n- SPI\n- SA match"]
+S9["STEP 9️⃣\nDecryption happens\n\nRemoves outer header\n\nInner Packet restored:\nSIP: 10.1.0.10\nDIP: 10.x.x.x"]
+S10["STEP 🔟\nRouting Decision\n\nAWS:\nRoute Table → VGW target\n\nAzure:\nUDR → VPN Gateway"]
+S11["STEP 1️⃣1️⃣\nSecurity Check\n\nAWS:\n- SG (stateful)\n- NACL (stateless)\n\nAzure:\n- NSG (stateful)"]
+S12["STEP 1️⃣2️⃣\nDelivered to VM\n\nAWS EC2 / Azure VM\n\nFinal Packet:\nSIP: 10.1.0.10\nDIP: 10.x.x.x"]
+%% ================= RETURN =================
+S13["STEP 1️⃣3️⃣\nReturn Traffic Generated\n\nInner:\nSIP: 10.x.x.x\nDIP: 10.1.0.10"]
+S14["STEP 1️⃣4️⃣\nRouting back to Gateway\n\nAWS RT / Azure UDR"]
+S15["STEP 1️⃣5️⃣\nRe-Encryption\n\nOuter:\nSIP: Cloud GW Public IP\nDIP: 185.10.10.1"]
+S16["STEP 1️⃣6️⃣\nInternet Return Path\n\nEncrypted ESP"]
+S17["STEP 1️⃣7️⃣\nFirewall Decrypts\n\nRemoves IPSec\n\nInner restored"]
+S18["STEP 1️⃣8️⃣\nDelivered to User\n\nSIP: 10.x.x.x\nDIP: 10.1.0.10"]
+%% ================= FLOW =================
+S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8 --> S9 --> S10 --> S11 --> S12
+S12 --> S13 --> S14 --> S15 --> S16 --> S17 --> S18
+```
 
