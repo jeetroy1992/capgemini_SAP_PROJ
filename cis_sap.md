@@ -51,3 +51,56 @@ AZ_VM -.->|"Return Traffic\nDecrypt → Route → Encrypt"| AZ_GW
 AWS_GW -.-> FW
 AZ_GW -.-> FW
 ```
+extra :
+
+```mermaid
+flowchart TB
+%% ================= TOP: ON-PREM =================
+subgraph ONPREM["🏢 ON-PREMISE DATA CENTER"]
+   U["👨‍💻 User\n10.1.0.10"]
+   SW["🧱 L2 Access Switch"]
+   FW["🔥 Edge Firewall / Router\nPublic IP: 185.10.10.1"]
+   U --> SW --> FW
+end
+%% ================= INTERNET =================
+INET["🌐 Internet\n(UDP 500 / UDP 4500 / ESP)"]
+FW --> INET
+%% ================= MAIN CLOUD BLOCK =================
+subgraph CLOUD["☁️ MULTI-CLOUD VPN ARCHITECTURE"]
+   direction LR
+   %% -------- AWS LEFT --------
+   subgraph AWS["🟧 AWS (LEFT)"]
+       direction TB
+       AWS_GW["🟧 Virtual Private Gateway (VGW)\nPublic IP: 3.110.20.30"]
+       AWS_ATTACH["📦 VGW Attachment (VPC)"]
+       AWS_RT["🧠 VPC Route Table\n10.1.0.0/24 → VGW"]
+       AWS_SEC["🔐 Security\nSecurity Group (Stateful)\nNACL (Stateless)"]
+       AWS_SUB["🌐 Subnet\n10.0.1.0/24"]
+       AWS_EC2["🖥️ EC2 Instance\n10.0.1.10"]
+       AWS_GW --> AWS_ATTACH --> AWS_RT --> AWS_SEC --> AWS_SUB --> AWS_EC2
+   end
+   %% -------- AZURE RIGHT --------
+   subgraph AZURE["🟦 AZURE (RIGHT)"]
+       direction TB
+       AZ_GW["🟦 Azure VPN Gateway\nPublic IP: 20.40.50.60"]
+       AZ_GWSUB["📦 GatewaySubnet\n10.207.16.128/27"]
+       AZ_RT["🧠 User Defined Route (UDR)\n10.1.0.0/24 → VPN Gateway"]
+       AZ_NSG["🔐 NSG\n(Subnet / NIC level filtering)"]
+       AZ_SUB["🌐 Subnet\n10.207.17.0/24"]
+       AZ_VM["🖥️ VM (SAP Server)\n10.207.17.4"]
+       AZ_GW --> AZ_GWSUB --> AZ_RT --> AZ_NSG --> AZ_SUB --> AZ_VM
+   end
+end
+%% ================= VPN TUNNELS =================
+INET --> AWS_GW
+INET --> AZ_GW
+FW ==>|"IKEv2 Phase-1 (ISAKMP SA)\nEncryption, DH Group, PSK"| AWS_GW
+FW ==>|"IKEv2 Phase-2 (IPSec SA)\nESP, SPI, Traffic Selectors"| AWS_GW
+FW ==>|"IKEv2 Phase-1 (ISAKMP SA)\nEncryption, DH Group, PSK"| AZ_GW
+FW ==>|"IKEv2 Phase-2 (IPSec SA)\nESP, SPI, Traffic Selectors"| AZ_GW
+%% ================= DATA FLOW =================
+AWS_EC2 -.->|"Return Traffic\n(Decrypt → Route → Encrypt)"| AWS_GW
+AZ_VM -.->|"Return Traffic\n(Decrypt → Route → Encrypt)"| AZ_GW
+AWS_GW -.-> FW
+AZ_GW -.-> FW
+```
