@@ -15,7 +15,7 @@ FW --> INET
 subgraph CLOUD["☁️ MULTI-CLOUD VPN ARCHITECTURE"]
    direction LR
    %% ================= AWS =================
-   subgraph AWS["🟧 AWS (LEFT)"]
+   subgraph AWS["🟧 AWS"]
        direction TB
        AWS_GW["🟧 Virtual Private Gateway (VGW)\nPublic IP: 3.110.20.30\n\n- IPSec termination\n- AWS-managed\n- Supports static/BGP VPN"]
        AWS_ATTACH["📦 VGW Attachment\n\n- Attaches VGW to VPC\n- Enables routing domain"]
@@ -26,7 +26,7 @@ subgraph CLOUD["☁️ MULTI-CLOUD VPN ARCHITECTURE"]
        AWS_GW --> AWS_ATTACH --> AWS_RT --> AWS_SEC --> AWS_SUB --> AWS_EC2
    end
    %% ================= AZURE =================
-   subgraph AZURE["🟦 AZURE (RIGHT)"]
+   subgraph AZURE["🟦 AZURE "]
        direction TB
        AZ_GW["🟦 Azure VPN Gateway\nPublic IP: 20.40.50.60\n\n- IPSec termination\n- Active/Active supported\n- Policy/Route-based VPN"]
        AZ_GWSUB["📦 GatewaySubnet\n10.207.16.128/27\n\n- Mandatory subnet\n- Hosts VPN Gateway"]
